@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EngSmart 3.0 - Super Trainer</title>
+    <style>
+        :root { --primary: #4a90e2; --bg-overlay: rgba(255,255,255,0.85); }
+        body, html { margin:0; padding:0; height:100vh; font-family: 'Comic Sans MS', cursive, sans-serif; overflow: hidden; }
+        
+        /* Стили Редактора */
+        #setup-screen {
+            position: fixed; inset: 0; background: #f0f4f8; z-index: 1000;
+            display: flex; align-items: center; justify-content: center; padding: 20px;
+        }
+        .setup-panel {
+            background: white; padding: 30px; border-radius: 20px; box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+            width: 100%; max-width: 500px; display: flex; flex-direction: column; gap: 15px;
+        }
+        textarea { height: 150px; padding: 10px; border: 2px solid #ddd; border-radius: 10px; resize: none; font-family: monospace; }
+        .btn-start { background: #2ecc71; color: white; border: none; padding: 15px; border-radius: 50px; font-weight: bold; cursor: pointer; font-size: 18px; transition: 0.3s; }
+        .btn-start:hover { transform: scale(1.05); background: #27ae60; }
+
+        /* Стили Игры */
+        #game-screen { display: none; height: 100vh; flex-direction: column; background-size: cover; background-position: center; }
+        .overlay { position: absolute; inset: 0; background: var(--bg-overlay); backdrop-filter: blur(5px); display: flex; flex-direction: column; }
+        
+        .header { height: 70px; display: flex; justify-content: center; align-items: center; gap: 20px; background: white; z-index: 10; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+        .dot { width: 15px; height: 15px; border-radius: 50%; background: #ddd; transition: 0.5s; }
+        .dot.active { background: var(--primary); transform: scale(1.3); box-shadow: 0 0 10px var(--primary); }
+
+        .content { flex-grow: 1; overflow-y: auto; padding: 20px; display: flex; flex-wrap: wrap; justify-content: center; align-content: flex-start; gap: 20px; z-index: 5; }
+        
+        /* LVL 1 */
+        .card { width: 160px; height: 220px; perspective: 1000px; cursor: pointer; }
+        .card-inner { position: relative; width: 100%; height: 100%; transition: 0.6s; transform-style: preserve-3d; }
+        .card.flipped .card-inner { transform: rotateY(180deg); }
+        .card-face { position: absolute; inset: 0; backface-visibility: hidden; background: white; border: 4px solid var(--primary); border-radius: 15px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 10px; text-align: center; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+        .card-back { transform: rotateY(180deg); background: #f0f7ff; color: var(--primary); font-size: 22px; font-weight: bold; }
+        .card img { max-width: 80%; max-height: 100px; object-fit: contain; margin-bottom: 10px; }
+
+        /* LVL 2 */
+        .match-item { padding: 15px; background: white; border: 3px solid var(--primary); border-radius: 12px; cursor: pointer; width: 45%; font-weight: bold; font-size: 18px; text-align: center; transition: 0.2s; }
+        .match-item.selected { background: var(--primary); color: white; }
+        .match-item.hidden { opacity: 0; pointer-events: none; }
+
+        /* LVL 3 */
+        .write-box { background: white; padding: 30px; border-radius: 20px; border: 5px solid var(--primary); text-align: center; width: 300px; margin: auto; }
+        #wordInput { width: 100%; font-size: 28px; text-align: center; border: none; border-bottom: 3px solid #ddd; outline: none; margin-top: 20px; text-transform: uppercase; }
+        #wordInput.error { animation: shake 0.3s; border-bottom-color: #e74c3c; color: #e74c3c; }
+        @keyframes shake { 0%,100% {transform:translateX(0)} 25% {transform:translateX(-8px)} 75% {transform:translateX(8px)} }
+
+        .footer { height: 100px; display: flex; justify-content: center; align-items: center; z-index: 10; }
+        .next-btn { padding: 15px 40px; background: var(--primary); color: white; border: none; border-radius: 50px; font-size: 18px; font-weight: bold; cursor: pointer; box-shadow: 0 5px 20px rgba(74,144,226,0.3); }
+
+        #victory { position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 2000; display: none; flex-direction: column; align-items: center; justify-content: center; color: white; }
+    </style>
+</head>
+<body>
+
+    <div id="setup-screen">
+        <div class="setup-panel">
+            <h2 style="margin:0; color: #4a90e2;">EngSmart 3.0 Setup</h2>
+            <label>1. Список слов (Word:Перевод:Картинка)</label>
+            <textarea id="wordsInput">Apple:Яблоко:https://cdn-icons-png.flaticon.com/512/415/415733.png
+Dog:Собака:https://cdn-icons-png.flaticon.com/512/616/616408.png
+Cat:Кот:https://cdn-icons-png.flaticon.com/512/616/616430.png</textarea>
+            
+            <label>2. Ссылка на фон</label>
+            <input type="text" id="bgInput" value="https://images.unsplash.com/photo-1518709268805-4e9042af9f23?q=80&w=1000" style="padding:10px; border-radius:8px; border:2px solid #ddd;">
+            
+            <button class="btn-start" onclick="startGame()">ЗАПУСТИТЬ ТРЕНАЖЕР 🚀</button>
+            <p style="font-size: 11px; color: #888; text-align: center;">Введи слова и нажми кнопку. После этого дай ссылку ребенку!</p>
+        </div>
+    </div>
+
+    <div id="game-screen">
+        <div class="overlay">
+            <div class="header">
+                <div class="dot active" id="d1"></div>
+                <div class="dot" id="d2"></div>
+                <div class="dot" id="d3"></div>
+            </div>
+            <div id="content" class="content"></div>
+            <div class="footer">
+                <button id="nextBtn" class="next-btn" onclick="nextLevel()">Я ВСЁ ВЫУЧИЛ! →</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="victory">
+        <h1 style="font-size: 50px; color: #f1c40f;">SUPERHERO! 🦸‍♂️</h1>
+        <p style="font-size: 20px;">Ты выучил все слова на сегодня!</p>
+        <button class="next-btn" onclick="location.reload()">ИГРАТЬ СНОВА</button>
+    </div>
+
+    <script>
+        let words = [];
+        let level = 1;
+        let matchSelected = { en: null, ru: null };
+        let writeIdx = 0;
+
+        function speak(text) {
+            const m = new SpeechSynthesisUtterance(text);
+            m.lang = 'en-US';
+            speechSynthesis.speak(m);
+        }
+
+        function startGame() {
+            const raw = document.getElementById('wordsInput').value;
+            words = raw.split('\n').filter(l => l.includes(':')).map(l => {
+                const [en, ru, im] = l.split(':');
+                return { en: en.trim(), ru: ru.trim(), im: im.trim() };
+            });
+            
+            document.getElementById('game-screen').style.backgroundImage = `url(${document.getElementById('bgInput').value})`;
+            document.getElementById('setup-screen').style.display = 'none';
+            document.getElementById('game-screen').style.display = 'flex';
+            renderLevel();
+        }
+
+        function renderLevel() {
+            const cont = document.getElementById('content');
+            cont.innerHTML = '';
+            document.querySelectorAll('.dot').forEach((d, i) => d.className = (i+1 === level) ? 'dot active' : 'dot');
+
+            if(level === 1) {
+                words.forEach(w => {
+                    const card = document.createElement('div');
+                    card.className = 'card';
+                    card.innerHTML = `<div class="card-inner">
+                        <div class="card-face"><img src="${w.im}"><div>${w.en}</div></div>
+                        <div class="card-face card-back">${w.ru}</div>
+                    </div>`;
+                    card.onclick = () => {
+                        card.classList.toggle('flipped');
+                        if(card.classList.contains('flipped')) speak(w.en);
+                    };
+                    cont.appendChild(card);
+                });
+            } else if(level === 2) {
+                document.getElementById('nextBtn').style.display = 'none';
+                const enList = [...words].sort(() => Math.random() - 0.5);
+                const ruList = [...words].sort(() => Math.random() - 0.5);
+                
+                const colEn = document.createElement('div'); colEn.style.width='45%';
+                const colRu = document.createElement('div'); colRu.style.width='45%';
+                
+                enList.forEach(w => {
+                    const b = document.createElement('div'); b.className = 'match-item'; b.innerText = w.en;
+                    b.onclick = () => { speak(w.en); handleMatch(w.en, 'en', b); };
+                    colEn.appendChild(b);
+                });
+                ruList.forEach(w => {
+                    const b = document.createElement('div'); b.className = 'match-item'; b.innerText = w.ru;
+                    b.onclick = () => handleMatch(w.en, 'ru', b);
+                    colRu.appendChild(b);
+                });
+                cont.append(colEn, colRu);
+            } else if(level === 3) {
+                document.getElementById('nextBtn').style.display = 'none';
+                const w = words[writeIdx];
+                cont.innerHTML = `<div class="write-box">
+                    <img src="${w.im}" style="width:100px;">
+                    <h3>${w.ru}</h3>
+                    <input type="text" id="wordInput" placeholder="..." autocomplete="off">
+                </div>`;
+                const inp = document.getElementById('wordInput');
+                inp.focus();
+                inp.oninput = () => {
+                    if(inp.value.toLowerCase() === w.en.toLowerCase()) {
+                        inp.style.color = '#2ecc71';
+                        setTimeout(() => {
+                            writeIdx++;
+                            if(writeIdx < words.length) renderLevel();
+                            else document.getElementById('victory').style.display = 'flex';
+                        }, 500);
+                    } else if(!w.en.toLowerCase().startsWith(inp.value.toLowerCase())) {
+                        inp.classList.add('error');
+                        setTimeout(() => inp.classList.remove('error'), 300);
+                    }
+                };
+            }
+        }
+
+        function handleMatch(val, type, btn) {
+            if(matchSelected[type]) matchSelected[type].btn.classList.remove('selected');
+            matchSelected[type] = { val, btn };
+            btn.classList.add('selected');
+            
+            if(matchSelected.en && matchSelected.ru) {
+                if(matchSelected.en.val === matchSelected.ru.val) {
+                    matchSelected.en.btn.classList.add('hidden');
+                    matchSelected.ru.btn.classList.add('hidden');
+                    matchSelected = { en: null, ru: null };
+                    if(document.querySelectorAll('.match-item:not(.hidden)').length === 0) {
+                        document.getElementById('nextBtn').style.display = 'block';
+                    }
+                } else {
+                    setTimeout(() => {
+                        matchSelected.en.btn.classList.remove('selected');
+                        matchSelected.ru.btn.classList.remove('selected');
+                        matchSelected = { en: null, ru: null };
+                    }, 400);
+                }
+            }
+        }
+
+        function nextLevel() {
+            level++;
+            renderLevel();
+        }
+    </script>
+</body>
+</html>
